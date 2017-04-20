@@ -16,7 +16,7 @@ namespace glossy {
 
 	struct object {
 		vec3 position{ 0.0, 0.0, 0.0 };
-		material material;
+		material mat;
 
 		virtual ~object() = default;
 		virtual std::ostream& print( std::ostream& stream ) const = 0;

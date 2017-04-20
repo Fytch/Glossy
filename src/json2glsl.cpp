@@ -130,7 +130,7 @@ namespace {
 			read( i, variable->position, "position" ) ||
 			( is_sphere && read( i, static_cast< sphere* >( &*variable )->radius, "radius" ) ) ||
 			( is_plane && read( i, static_cast< plane* >( &*variable )->normal, "normal" ) ) ||
-			read( i, variable->material, "material" ) ||
+			read( i, variable->mat, "material" ) ||
 			( throw std::runtime_error{ "unrecognized object property: " + i.key() }, false );
 		}
 

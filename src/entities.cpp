@@ -31,7 +31,7 @@ std::ostream& glossy::material::print( std::ostream& stream ) const {
 
 std::ostream& glossy::sphere::print( std::ostream& stream ) const {
 	stream << type() << "( vec3" << position << ", " << radius << ", ";
-	material.print( stream );
+	mat.print( stream );
 	stream << " )";
 	return stream;
 }
@@ -41,7 +41,7 @@ char const* glossy::sphere::type() const {
 
 std::ostream& glossy::plane::print( std::ostream& stream ) const {
 	stream << type() << "( vec3" << position << ", vec3" << normal << ", ";
-	material.print( stream );
+	mat.print( stream );
 	stream << " )";
 	return stream;
 }
