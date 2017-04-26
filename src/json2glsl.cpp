@@ -209,6 +209,27 @@ std::string glossy::json2glsl( std::istream& stream ) {
 	if( rendering_distance <= 0.0 )
 		throw std::range_error{ "rendering_distance must be positive" };
 
+	const auto gen_eval_funs = [ & ]( std::ostream& stream, char const* type ) -> decltype( auto ) {
+		stream <<
+			"bool eval_occ( ray r, float dist, const " << type << " obj ) {"
+			"	float d = intersect( r, obj );"
+			"	return d != no_hit && d < dist;"
+			"}";
+		for( unsigned i = 0; i <= recursion; ++i ) {
+		stream <<
+			"void eval" << i << "( ray r, inout vec3 color, inout float dist, const " << type << " obj ) {"
+			"	float d = intersect( r, obj );"
+			"	if( d != no_hit && d < dist && d < " << rendering_distance << " ) {"
+			"		vec3 i = propagate( r, d );"
+			"		color = materialize" << i << "( r, obj.mat, i, i - obj.p, normal( i, obj ) );"
+			"		dist = d;"
+			"	}"
+			"}";
+		}
+		stream << "\n";
+		return stream;
+	};
+
 	std::ostringstream code;
 	code << "#version 130\n";
 
@@ -271,8 +292,7 @@ std::string glossy::json2glsl( std::istream& stream ) {
 	}
 
 	// forwards
-	code << "vec3 pathtrace( ray r );";
-	for( unsigned i = 1; i <= recursion; ++i )
+	for( unsigned i = 0; i <= recursion; ++i )
 		code << "vec3 pathtrace" << i << "( ray r );";
 	code << "vec3 pathtracedummy( ray r ) {"
 			"	return vec3( 1.0, 1.0, 1.0 );"
@@ -299,70 +319,43 @@ std::string glossy::json2glsl( std::istream& stream ) {
 			"const uint mat_specular	= 0x04u;";
 
 	// materialize funs
-	code << "\n"
-			"#define gen_materialize( name, next )"
-			"vec3 materialize##name( ray r, const material mat, vec3 glob, vec3 rel, vec3 n ) {"
-			"	vec3 col = mat.col;"
-			"	vec3 result = vec3( 0.0 );"
-			"	float denom = 0.0;"
-			"	if( ( mat.type & mat_checkered ) != 0u ) {"
-			"		if( ( mod( rel.x, 2.0 ) < 1.0 ) ^^ ( mod( rel.z, 2.0 ) < 1.0 ) )"
-			"			col *= 0.5;"
-			"	}"
-			"	if( ( mat.type & mat_diffuse ) != 0u ) {";
-	if( lights.empty() ) {
-		code << "		result += col * background;";
-	} else {
-		code << "		vec3 diff = vec3( 0.0 );"
-				"		for( int i = 0; i < lights.length(); ++i )"
-				"			diff += diffuse( lights[ i ], col, glob, n );"
-				"		result += diff * 1.0;";
-	}
-	code << "		++denom;"
-			"	}"
-			"	if( ( mat.type & mat_specular ) != 0u ) {"
-			"		ray ref = ray( glob, reflect( r.d, n ) );"
-			"		ref.o += ref.d * 1.0e-3;"
-			"		result += col * pathtrace##next( ref );"
-			"		++denom;"
-			"	}"
-			"	return result / denom;"
-			"}\n";
+	std::string materialize_name;
+	std::string materialize_tail_name = "0";
 	for( unsigned i = 0; i <= recursion; ++i ) {
-		code << "gen_materialize( ";
-		if( i != 0 )
-			code << i;
-		code << ", ";
+		materialize_name = std::move( materialize_tail_name );
 		if( i != recursion )
-			code << i + 1;
+			materialize_tail_name = std::to_string( i + 1 );
 		else
-			code << "dummy";
-		code << " );";
+			materialize_tail_name = "dummy";
+		code << "\n"
+				"vec3 materialize" << materialize_name << "( ray r, const material mat, vec3 glob, vec3 rel, vec3 n ) {"
+				"	vec3 col = mat.col;"
+				"	vec3 result = vec3( 0.0 );"
+				"	float denom = 0.0;"
+				"	if( ( mat.type & mat_checkered ) != 0u ) {"
+				"		if( ( mod( rel.x, 2.0 ) < 1.0 ) ^^ ( mod( rel.z, 2.0 ) < 1.0 ) )"
+				"			col *= 0.5;"
+				"	}"
+				"	if( ( mat.type & mat_diffuse ) != 0u ) {";
+		if( lights.empty() ) {
+			code << "		result += col * background;";
+		} else {
+			code << "		vec3 diff = vec3( 0.0 );"
+					"		for( int i = 0; i < lights.length(); ++i )"
+					"			diff += diffuse( lights[ i ], col, glob, n );"
+					"		result += diff * 1.0;";
+		}
+		code << "		++denom;"
+				"	}"
+				"	if( ( mat.type & mat_specular ) != 0u ) {"
+				"		ray ref = ray( glob, reflect( r.d, n ) );"
+				"		ref.o += ref.d * 1.0e-3;"
+				"		result += col * pathtrace" << materialize_tail_name << "( ref );"
+				"		++denom;"
+				"	}"
+				"	return result / denom;"
+				"}\n";
 	}
-
-	// eval funs
-	code << "\n"
-			"#define gen_eval_fun( type, name )"
-			"void eval##name( ray r, inout vec3 color, inout float dist, const type obj ) {"
-			"	float d = intersect( r, obj );"
-			"	if( d != no_hit && d < dist && d < " << rendering_distance << " ) {"
-			"		vec3 i = propagate( r, d );"
-			"		color = materialize##name( r, obj.mat, i, i - obj.p, normal( i, obj ) );"
-			"		dist = d;"
-			"	}"
-			"}\n"
-			"#define gen_eval_funs( type )"
-			"bool eval_occ( ray r, float dist, const type obj ) {"
-			"	float d = intersect( r, obj );"
-			"	return d != no_hit && d < dist;"
-			"}";
-	for( unsigned i = 0; i <= recursion; ++i ) {
-		code << "gen_eval_fun( type, ";
-		if( i != 0 )
-			code << i;
-		code << " )";
-	}
-	code << "\n";
 
 	// sphere class
 	code << "struct sphere {"
@@ -391,8 +384,8 @@ std::string glossy::json2glsl( std::istream& stream ) {
 			"}"
 			"vec3 normal( vec3 i, const sphere obj ) {"
 			"	return normalize( i - obj.p );"
-			"}"
-			"gen_eval_funs( sphere )";
+			"}";
+	gen_eval_funs( code, "sphere" );
 
 	// plane class
 	code << "struct plane {"
@@ -411,8 +404,8 @@ std::string glossy::json2glsl( std::istream& stream ) {
 			"}"
 			"vec3 normal( vec3 i, const plane obj ) {"
 			"	return normalize( obj.n );"
-			"}"
-			"gen_eval_funs( plane )";
+			"}";
+	gen_eval_funs( code, "plane" );
 
 	// scene description
 	for( std::size_t i = 0; i < objects.size(); ++i ) {
@@ -422,21 +415,15 @@ std::string glossy::json2glsl( std::istream& stream ) {
 	}
 
 	// pathtracing funs
-	code << "\n"
-			"#define gen_pathtrace( name )"
-			"vec3 pathtrace##name( ray r ) {"
-			"	vec3 col = background;"
-			"	float dist = no_hit;";
-	for( std::size_t i = 0; i < objects.size(); ++i ) {
-		code << "	eval##name( r, col, dist, obj" << i << " );";
-	}
-	code << "	return col;"
-			"}\n";
 	for( unsigned i = 0; i <= recursion; ++i ) {
-		code << "gen_pathtrace(";
-		if( i != 0 )
-			code << " " << i << " ";
-		code << " )";
+		code << "vec3 pathtrace" << i << "( ray r ) {"
+				"	vec3 col = background;"
+				"	float dist = no_hit;";
+		for( std::size_t j = 0; j < objects.size(); ++j ) {
+			code << "	eval" << i << "( r, col, dist, obj" << j << " );";
+		}
+		code << "	return col;"
+				"}\n";
 	}
 
 	// visibility checker function
@@ -460,7 +447,7 @@ std::string glossy::json2glsl( std::istream& stream ) {
 			"	ray pixelray;"
 			"	pixelray.o = pos;"
 			"	pixelray.d = normalize( at + normalized.x * right + normalized.y * up );"
-			"	return pathtrace( pixelray );"
+			"	return pathtrace0( pixelray );"
 			"}";
 
 	const vec2 sub{ 1.0f / SS, 1.0f / SS };
@@ -468,15 +455,22 @@ std::string glossy::json2glsl( std::istream& stream ) {
 
 	// main function
 	code << "void main() {"
-			"	vec3 result = vec3( 0.0 );"
-			"	for( int y = 0; y < SS; ++y ) {"
-			"		for( int x = 0; x < SS; ++x ) {"
-			"			vec2 subpix = gl_FragCoord.xy + vec2" << off << " + vec2" << sub << " * vec2( x, y );"
-			"			result += calc( subpix );"
-			"		}"
-			"	}"
-			"	gl_FragColor = vec4( result / sq( SS ), 1.0 );"
-			"}";
+			"	vec3 result = vec3( 0.0 );";
+
+	if( SS != 1 ) {
+		code << "	for( int y = 0; y < SS; ++y ) {"
+				"		for( int x = 0; x < SS; ++x ) {"
+				"			vec2 subpix = gl_FragCoord.xy + vec2" << off << " + vec2" << sub << " * vec2( x, y );"
+				"			result += calc( subpix );"
+				"		}"
+				"	}"
+				"	gl_FragColor = vec4( result / sq( SS ), 1.0 );";
+	} else {
+		code << "	vec2 subpix = gl_FragCoord.xy + vec2" << off << ";"
+				"	result += calc( subpix );"
+				"	gl_FragColor = vec4( result, 1.0 );";
+	}
+	code << "}";
 
 	return code.str();
 }
