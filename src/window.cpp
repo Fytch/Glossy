@@ -69,7 +69,8 @@ glossy::window::window( int argc, char** argv ) {
 		dump << code;
 		throw std::runtime_error{ "unable to process shader (see dump.log)" };
 	}
-	update_resolution( 1280, 720 );
+	const auto desktop = sf::VideoMode::getDesktopMode();
+	update_resolution( desktop.width * 2 / 3, desktop.height * 2 / 3 );
 	m_window.create( sf::VideoMode{ static_cast< unsigned >( m_size.x ), static_cast< unsigned >( m_size.y ) }, m_title, sf::Style::Default, sf::ContextSettings{ 0, 0, 0, 3, 0 } );
 	m_window.setView( sf::View{ { 0, 1, 1, -1 } } );
 	m_window.setMouseCursorVisible( false );
