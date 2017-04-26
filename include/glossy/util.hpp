@@ -18,7 +18,7 @@ namespace glossy {
 		std::string x, y, z;
 	};
 	inline std::ostream& operator<<( std::ostream& stream, strvec3 const& vec ) {
-		return stream << "( (" << vec.x << "), (" << vec.y << "), (" << vec.z << ") )";
+		return stream << "( ( " << vec.x << " ), ( " << vec.y << " ), ( " << vec.z << " ) )";
 	}
 
 	inline vec3 cross( vec3 u, vec3 v ) {

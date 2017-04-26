@@ -6,6 +6,7 @@
 #include <string>
 #include <stdexcept>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 
 void glossy::window::update_resolution( unsigned int width, unsigned int height ) {
@@ -63,8 +64,11 @@ glossy::window::window( int argc, char** argv ) {
 		code = json2glsl( argv[ 1 ] );
 	else
 		code = json2glsl( default_scene );
-	if( !m_shader.loadFromMemory( code, sf::Shader::Fragment ) )
-		throw std::runtime_error{ "unable to process shader" };
+	if( !m_shader.loadFromMemory( code, sf::Shader::Fragment ) ) {
+		std::ofstream dump{ "dump.log", std::ofstream::trunc };
+		dump << code;
+		throw std::runtime_error{ "unable to process shader (see dump.log)" };
+	}
 	update_resolution( 1280, 720 );
 	m_window.create( sf::VideoMode{ static_cast< unsigned >( m_size.x ), static_cast< unsigned >( m_size.y ) }, m_title, sf::Style::Default, sf::ContextSettings{ 0, 0, 0, 3, 0 } );
 	m_window.setView( sf::View{ { 0, 1, 1, -1 } } );

@@ -211,112 +211,111 @@ std::string glossy::json2glsl( std::istream& stream ) {
 
 	const auto gen_eval_funs = [ & ]( std::ostream& stream, char const* type ) -> decltype( auto ) {
 		stream <<
-			"bool eval_occ( ray r, float dist, const " << type << " obj ) {"
-			"	float d = intersect( r, obj );"
-			"	return d != no_hit && d < dist;"
-			"}";
+			"bool eval_occ( ray r, float dist, const " << type << " obj ) {\n"
+			"	float d = intersect( r, obj );\n"
+			"	return d != no_hit && d < dist;\n"
+			"}\n";
 		for( unsigned i = 0; i <= recursion; ++i ) {
 		stream <<
-			"void eval" << i << "( ray r, inout vec3 color, inout float dist, const " << type << " obj ) {"
-			"	float d = intersect( r, obj );"
-			"	if( d != no_hit && d < dist && d < " << rendering_distance << " ) {"
-			"		vec3 i = propagate( r, d );"
-			"		color = materialize" << i << "( r, obj.mat, i, i - obj.p, normal( i, obj ) );"
-			"		dist = d;"
-			"	}"
-			"}";
+			"void eval" << i << "( ray r, inout vec3 color, inout float dist, const " << type << " obj ) {\n"
+			"	float d = intersect( r, obj );\n"
+			"	if( d != no_hit && d < dist && d < " << rendering_distance << " ) {\n"
+			"		vec3 i = propagate( r, d );\n"
+			"		color = materialize" << i << "( r, obj.mat, i, i - obj.p, normal( i, obj ) );\n"
+			"		dist = d;\n"
+			"	}\n"
+			"}\n";
 		}
-		stream << "\n";
 		return stream;
 	};
 
 	std::ostringstream code;
-	code << "#version 130\n";
+	code << "#version 130\n\n";
 
 	// uniforms
-	code << "uniform vec2 resolution;";
-	code << "uniform float global_time;";
-	code << "uniform vec3 pos;";
-	code << "uniform vec3 at;";
-	code << "uniform vec3 up;";
-	code << "uniform vec3 right;";
+	code << "uniform vec2 resolution;\n";
+	code << "uniform float global_time;\n";
+	code << "uniform vec3 pos;\n";
+	code << "uniform vec3 at;\n";
+	code << "uniform vec3 up;\n";
+	code << "uniform vec3 right;\n\n";
 
 	// constants
-	code << "const int SS = " << SS << ";";
-	code << "const float fovy = " << deg2rad( fovy ) << ";";
-	code << "const float fovh = " << std::tan( deg2rad( fovy ) / 2.0 ) << ";";
-	code << "const float no_hit = 1.0 / 0.0;";
+	code << "const int SS = " << SS << ";\n";
+	code << "const float fovy = " << deg2rad( fovy ) << ";\n";
+	code << "const float fovh = " << std::tan( deg2rad( fovy ) / 2.0 ) << ";\n";
+	code << "const float no_hit = 1.0 / 0.0;\n";
 
 	// background color
-	code << "const vec3 background = vec3" << background << ";";
+	code << "const vec3 background = vec3" << background << ";\n\n";
 
 	// util funs
-	code << "float sq( float x ) {"
-			"	return x * x;"
-			"}";
-	code << "float normsq( vec3 v ) {"
-			"	return dot( v, v );"
-			"}";
-	code << "void swap( inout float x, inout float y ) {"
-			"	float temp = x;"
-			"	x = y;"
-			"	y = temp;"
-			"}";
+	code << "float sq( float x ) {\n"
+			"	return x * x;\n"
+			"}\n";
+	code << "float normsq( vec3 v ) {\n"
+			"	return dot( v, v );\n"
+			"}\n";
+	code << "void swap( inout float x, inout float y ) {\n"
+			"	float temp = x;\n"
+			"	x = y;\n"
+			"	y = temp;\n"
+			"}\n\n";
 
 	// ray class
-	code << "struct ray {"
-			"	vec3 o;"
-			"	vec3 d;"
-			"};";
-	code << "vec3 propagate( ray r, float dist ) {"
-			"	return r.o + r.d * dist;"
-			"}";
+	code << "struct ray {\n"
+			"	vec3 o;\n"
+			"	vec3 d;\n"
+			"};\n";
+	code << "vec3 propagate( ray r, float dist ) {\n"
+			"	return r.o + r.d * dist;\n"
+			"}\n\n";
 
 	// light class
-	code << "struct light {"
-			"	vec3 p;"
-			"	vec3 col;"
-			"};";
+	code << "struct light {\n"
+			"	vec3 p;\n"
+			"	vec3 col;\n"
+			"};\n";
 
 	// light description
 	if( !lights.empty() ) {
 		code << "light lights[ " << lights.size() << " ] = light[ " << lights.size() << " ](";
 		for( std::size_t i = 0;; ) {
-			code << "	";
+			code << "\n\t";
 			lights[ i ].print( code );
 			if( ++i >= lights.size() )
 				break;
 			code << ",";
 		}
-		code << ");";
+		code << "\n);\n\n";
 	}
 
 	// forwards
 	for( unsigned i = 0; i <= recursion; ++i )
-		code << "vec3 pathtrace" << i << "( ray r );";
-	code << "vec3 pathtracedummy( ray r ) {"
-			"	return vec3( 1.0, 1.0, 1.0 );"
-			"}"
-			"bool visible( ray r, light l );";
+		code << "vec3 pathtrace" << i << "( ray r );\n";
+	code << "vec3 pathtracedummy( ray r ) {\n"
+			"	return vec3( 1.0, 1.0, 1.0 );\n"
+			"}\n"
+			"bool visible( ray r, light l );\n\n";
 
 	// diffuse lighting
-	code << "vec3 diffuse( light l, vec3 col, vec3 p, vec3 n ) {"
-			"	vec3 path = l.p - p;"
-			"	float len = length( path );"
-			"	path /= len;"
-			"	ray lr = ray( p, path );"
-			"	lr.o = propagate( lr, 1.0e-2 );"
-			"	return float( visible( lr, l ) ) * l.col * col / sq( len ) * dot( path, n );"
-			"}";
+	code << "vec3 diffuse( light l, vec3 col, vec3 p, vec3 n ) {\n"
+			"	vec3 path = l.p - p;\n"
+			"	float len = length( path );\n"
+			"	path /= len;\n"
+			"	ray lr = ray( p, path );\n"
+			"	lr.o = propagate( lr, 1.0e-2 );\n"
+			"	return float( visible( lr, l ) ) * l.col * col / sq( len ) * dot( path, n );\n"
+			"}\n\n";
 
 	// material class
-	code << "struct material {"
-			"	uint type;"
-			"	vec3 col;"
-			"};"
-			"const uint mat_checkered	= 0x01u;"
-			"const uint mat_diffuse		= 0x02u;"
-			"const uint mat_specular	= 0x04u;";
+	code << "struct material {\n"
+			"	uint type;\n"
+			"	vec3 col;\n"
+			"};\n"
+			"const uint mat_checkered = 0x01u;\n"
+			"const uint mat_diffuse   = 0x02u;\n"
+			"const uint mat_specular  = 0x04u;\n\n";
 
 	// materialize funs
 	std::string materialize_name;
@@ -327,150 +326,151 @@ std::string glossy::json2glsl( std::istream& stream ) {
 			materialize_tail_name = std::to_string( i + 1 );
 		else
 			materialize_tail_name = "dummy";
-		code << "\n"
-				"vec3 materialize" << materialize_name << "( ray r, const material mat, vec3 glob, vec3 rel, vec3 n ) {"
-				"	vec3 col = mat.col;"
-				"	vec3 result = vec3( 0.0 );"
-				"	float denom = 0.0;"
-				"	if( ( mat.type & mat_checkered ) != 0u ) {"
-				"		if( ( mod( rel.x, 2.0 ) < 1.0 ) ^^ ( mod( rel.z, 2.0 ) < 1.0 ) )"
+		code << "vec3 materialize" << materialize_name << "( ray r, const material mat, vec3 glob, vec3 rel, vec3 n ) {\n"
+				"	vec3 col = mat.col;\n"
+				"	vec3 result = vec3( 0.0 );\n"
+				"	float denom = 0.0;\n"
+				"	if( ( mat.type & mat_checkered ) != 0u ) {\n"
+				"		if( ( mod( rel.x, 2.0 ) < 1.0 ) ^^ ( mod( rel.z, 2.0 ) < 1.0 ) )\n"
 				"			col *= 0.5;"
-				"	}"
-				"	if( ( mat.type & mat_diffuse ) != 0u ) {";
+				"	}\n"
+				"	if( ( mat.type & mat_diffuse ) != 0u ) {\n";
 		if( lights.empty() ) {
-			code << "		result += col * background;";
+			code << "		result += col * background;\n";
 		} else {
-			code << "		vec3 diff = vec3( 0.0 );"
-					"		for( int i = 0; i < lights.length(); ++i )"
-					"			diff += diffuse( lights[ i ], col, glob, n );"
-					"		result += diff * 1.0;";
+			code << "		vec3 diff = vec3( 0.0 );\n"
+					"		for( int i = 0; i < lights.length(); ++i )\n"
+					"			diff += diffuse( lights[ i ], col, glob, n );\n"
+					"		result += diff * 1.0;\n";
 		}
-		code << "		++denom;"
-				"	}"
-				"	if( ( mat.type & mat_specular ) != 0u ) {"
-				"		ray ref = ray( glob, reflect( r.d, n ) );"
-				"		ref.o += ref.d * 1.0e-3;"
-				"		result += col * pathtrace" << materialize_tail_name << "( ref );"
-				"		++denom;"
-				"	}"
-				"	return result / denom;"
-				"}\n";
+		code << "		++denom;\n"
+				"	}\n"
+				"	if( ( mat.type & mat_specular ) != 0u ) {\n"
+				"		ray ref = ray( glob, reflect( r.d, n ) );\n"
+				"		ref.o += ref.d * 1.0e-3;\n"
+				"		result += col * pathtrace" << materialize_tail_name << "( ref );\n"
+				"		++denom;\n"
+				"	}\n"
+				"	return result / denom;\n"
+				"}\n\n";
 	}
 
 	// sphere class
-	code << "struct sphere {"
-			"	vec3 p;"
-			"	float r;"
-			"	material mat;"
-			"};"
-			"float intersect( ray r, const sphere obj ) {"
-			"	float ang = dot( r.d, r.o - obj.p );"
-			"	float radicand = sq( ang ) - normsq( r.o - obj.p ) + sq( obj.r );"
-			"	if( radicand < 0.0 )"
-			"		return no_hit;"
-			"	radicand = sqrt( radicand );"
-			"	float r1 = -ang + radicand;"
-			"	float r2 = -ang - radicand;"
-			"	if( r1 > r2 )"
-			"		swap( r1, r2 );"
-			"	if( r2 < 0.0 ) {"
-			"		return no_hit;"
-			"	} else {"
-			"		if( r1 < 0.0 )"
-			"			return r2;"
-			"		else"
-			"			return r1;"
-			"	}"
-			"}"
-			"vec3 normal( vec3 i, const sphere obj ) {"
-			"	return normalize( i - obj.p );"
-			"}";
-	gen_eval_funs( code, "sphere" );
+	code << "struct sphere {\n"
+			"	vec3 p;\n"
+			"	float r;\n"
+			"	material mat;\n"
+			"};\n"
+			"float intersect( ray r, const sphere obj ) {\n"
+			"	float ang = dot( r.d, r.o - obj.p );\n"
+			"	float radicand = sq( ang ) - normsq( r.o - obj.p ) + sq( obj.r );\n"
+			"	if( radicand < 0.0 )\n"
+			"		return no_hit;\n"
+			"	radicand = sqrt( radicand );\n"
+			"	float r1 = -ang + radicand;\n"
+			"	float r2 = -ang - radicand;\n"
+			"	if( r1 > r2 )\n"
+			"		swap( r1, r2 );\n"
+			"	if( r2 < 0.0 ) {\n"
+			"		return no_hit;\n"
+			"	} else {\n"
+			"		if( r1 < 0.0 )\n"
+			"			return r2;\n"
+			"		else\n"
+			"			return r1;\n"
+			"	}\n"
+			"}\n"
+			"vec3 normal( vec3 i, const sphere obj ) {\n"
+			"	return normalize( i - obj.p );\n"
+			"}\n";
+	gen_eval_funs( code, "sphere" ) << '\n';
 
 	// plane class
-	code << "struct plane {"
-			"	vec3 p;"
-			"	vec3 n;"
-			"	material mat;"
-			"};"
-			"float intersect( ray r, const plane obj ) {"
-			"	float denom = dot( r.d, obj.n );"
-			"	if( denom != 0.0 ) {"
-			"		float result = dot( obj.p - r.o, obj.n ) / denom;"
-			"		if( result > 0.0 )"
-			"			return result;"
-			"	}"
-			"	return no_hit;"
-			"}"
-			"vec3 normal( vec3 i, const plane obj ) {"
-			"	return normalize( obj.n );"
-			"}";
-	gen_eval_funs( code, "plane" );
+	code << "struct plane {\n"
+			"	vec3 p;\n"
+			"	vec3 n;\n"
+			"	material mat;\n"
+			"};\n"
+			"float intersect( ray r, const plane obj ) {\n"
+			"	float denom = dot( r.d, obj.n );\n"
+			"	if( denom != 0.0 ) {\n"
+			"		float result = dot( obj.p - r.o, obj.n ) / denom;\n"
+			"		if( result > 0.0 )\n"
+			"			return result;\n"
+			"	}\n"
+			"	return no_hit;\n"
+			"}\n"
+			"vec3 normal( vec3 i, const plane obj ) {\n"
+			"	return normalize( obj.n );\n"
+			"}\n";
+	gen_eval_funs( code, "plane" ) << '\n';
 
 	// scene description
 	for( std::size_t i = 0; i < objects.size(); ++i ) {
 		code << "const " << objects[ i ]->type() << " obj" << i << " = ";
 		objects[ i ]->print( code );
-		code << ";";
+		code << ";\n";
 	}
+	code << '\n';
 
 	// pathtracing funs
 	for( unsigned i = 0; i <= recursion; ++i ) {
-		code << "vec3 pathtrace" << i << "( ray r ) {"
-				"	vec3 col = background;"
-				"	float dist = no_hit;";
+		code << "vec3 pathtrace" << i << "( ray r ) {\n"
+				"	vec3 col = background;\n"
+				"	float dist = no_hit;\n";
 		for( std::size_t j = 0; j < objects.size(); ++j ) {
-			code << "	eval" << i << "( r, col, dist, obj" << j << " );";
+			code << "	eval" << i << "( r, col, dist, obj" << j << " );\n";
 		}
-		code << "	return col;"
+		code << "	return col;\n"
 				"}\n";
 	}
+	code << '\n';
 
 	// visibility checker function
 	if( objects.empty() ) {
-		code << "bool visible( ray r, light l ) {"
-				"	return true;"
-				"}";
+		code << "bool visible( ray r, light l ) {\n"
+				"	return true;\n"
+				"}\n\n";
 	} else {
-		code << "bool visible( ray r, light l ) {"
-				"	float dist = length( r.o - l.p );"
+		code << "bool visible( ray r, light l ) {\n"
+				"	float dist = length( r.o - l.p );\n"
 				"	return";
 		std::size_t i;
 		for( i = 0; i < objects.size() - 1; ++i )
-			code << "		!eval_occ( r, dist, obj" << i << " ) &&";
-		code << "		!eval_occ( r, dist, obj" << i << " );";
-		code << "}";
+			code << "\n\t\t!eval_occ( r, dist, obj" << i << " ) &&";
+		code << "\n\t\t!eval_occ( r, dist, obj" << i << " );\n";
+		code << "}\n\n";
 	}
 
-	code << "vec3 calc( vec2 screen_coord ) {"
-			"	vec2 normalized = ( screen_coord - resolution / 2.0 ) * 2.0 / resolution.y * fovh;"
-			"	ray pixelray;"
-			"	pixelray.o = pos;"
-			"	pixelray.d = normalize( at + normalized.x * right + normalized.y * up );"
-			"	return pathtrace0( pixelray );"
-			"}";
+	code << "vec3 calc( vec2 screen_coord ) {\n"
+			"	vec2 normalized = ( screen_coord - resolution / 2.0 ) * 2.0 / resolution.y * fovh;\n"
+			"	ray pixelray;\n"
+			"	pixelray.o = pos;\n"
+			"	pixelray.d = normalize( at + normalized.x * right + normalized.y * up );\n"
+			"	return pathtrace0( pixelray );\n"
+			"}\n\n";
 
 	const vec2 sub{ 1.0f / SS, 1.0f / SS };
 	const vec2 off = sub / 2.0f;
 
 	// main function
-	code << "void main() {"
-			"	vec3 result = vec3( 0.0 );";
+	code << "void main() {\n"
+			"	vec3 result = vec3( 0.0 );\n";
 
 	if( SS != 1 ) {
-		code << "	for( int y = 0; y < SS; ++y ) {"
-				"		for( int x = 0; x < SS; ++x ) {"
-				"			vec2 subpix = gl_FragCoord.xy + vec2" << off << " + vec2" << sub << " * vec2( x, y );"
-				"			result += calc( subpix );"
-				"		}"
-				"	}"
-				"	gl_FragColor = vec4( result / sq( SS ), 1.0 );";
+		code << "	for( int y = 0; y < SS; ++y ) {\n"
+				"		for( int x = 0; x < SS; ++x ) {\n"
+				"			vec2 subpix = gl_FragCoord.xy + vec2" << off << " + vec2" << sub << " * vec2( x, y );\n"
+				"			result += calc( subpix );\n"
+				"		}\n"
+				"	}\n"
+				"	gl_FragColor = vec4( result / sq( SS ), 1.0 );\n";
 	} else {
-		code << "	vec2 subpix = gl_FragCoord.xy + vec2" << off << ";"
-				"	result += calc( subpix );"
-				"	gl_FragColor = vec4( result, 1.0 );";
+		code << "	vec2 subpix = gl_FragCoord.xy + vec2" << off << ";\n"
+				"	result += calc( subpix );\n"
+				"	gl_FragColor = vec4( result, 1.0 );\n";
 	}
-	code << "}";
+	code << "}\n";
 
 	return code.str();
 }
