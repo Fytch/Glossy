@@ -24,5 +24,7 @@ file( GLOB_RECURSE srcs "./src/*.cpp" )
 add_library( glossy_objs OBJECT ${srcs} )
 
 add_executable( Glossy $<TARGET_OBJECTS:glossy_objs> )
-target_link_libraries( Glossy debug sfml-system-d sfml-window-d sfml-graphics-d )
-target_link_libraries( Glossy optimized sfml-system sfml-window sfml-graphics )
+target_link_libraries( Glossy
+	debug     sfml-system-d   optimized sfml-system
+	debug     sfml-window-d   optimized sfml-window
+	debug     sfml-graphics-d optimized sfml-graphics )
