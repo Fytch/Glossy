@@ -2,7 +2,7 @@
 #include <glossy/json2glsl.hpp>
 #include <glossy/entities.hpp>
 #include <glossy/util.hpp>
-#include <json.hpp>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <memory>
 #include <vector>

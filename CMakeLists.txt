@@ -18,7 +18,7 @@ set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -ggdb -fno-omit-frame-po
 set( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG -s -flto" )
 
 include_directories( "./include/" )
-include_directories( "./ext/" )
+include_directories( "./ext/json/include/" )
 
 file( GLOB_RECURSE srcs "./src/*.cpp" )
 add_library( glossy_objs OBJECT ${srcs} )
